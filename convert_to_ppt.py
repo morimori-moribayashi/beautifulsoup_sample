@@ -83,3 +83,28 @@ first_h1 = soup.find('h1')
 
 print(first_h1.text)
 
+next_sibling = first_h1.find_all_next()
+for sibling in next_sibling:
+        
+    if sibling.name == 'h2':
+        print(sibling.text)
+        
+    elif sibling.name == 'p':
+        print(sibling.text)
+        
+    elif sibling.name == 'ul':
+        
+        for li in sibling.find_all('li'):
+            print(li.text)
+        
+    elif sibling.name == 'table':
+        
+        header = [title.text for title in sibling.find_all('th')]
+        print(header)
+
+        for row in sibling.find_all('tr'):
+            
+            cells = row.find_all('td')
+            cell = [cell.text for cell in cells]
+            
+            print(cell)
