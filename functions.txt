@@ -1,0 +1,114 @@
+const { OpenAI } = require('openai');
+
+// OpenAI APIクライアントの初期化
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// PowerPointを生成する関数（既に実装済みと仮定）
+async function generatePowerPoint(content) {
+  // ここでPowerPointを生成するロジックを実行
+  // 実際の実装はすでにあるとのこと
+  
+  // 仮のBlobストレージリンクを返す
+  return "https://your-blob-storage.com/presentations/generated-ppt-12345.pptx";
+}
+
+// メイン関数：ユーザープロンプトを処理してPowerPoint生成関数を呼び出す
+async function processUserPrompt(userPrompt) {
+  try {
+    // Step 1: OpenAI APIを使って関数呼び出しの判断をする
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",  // または使用したいモデル
+      messages: [
+        { role: "system", content: "あなたはユーザーの要求を理解し、必要に応じてPowerPointの作成を手伝います。" },
+        { role: "user", content: userPrompt }
+      ],
+      functions: [
+        {
+          name: "create_powerpoint",
+          description: "ユーザーが要求した内容でPowerPointプレゼンテーションを作成します",
+          parameters: {
+            type: "object",
+            properties: {
+              content: {
+                type: "string",
+                description: "PowerPointに含める内容"
+              },
+              title: {
+                type: "string",
+                description: "プレゼンテーションのタイトル（任意）"
+              }
+            },
+            required: ["content"]
+          }
+        }
+      ],
+      function_call: "auto"
+    });
+
+    // Step 2: レスポンスから関数呼び出しが必要かチェック
+    const message = response.choices[0].message;
+
+    if (message.function_call && message.function_call.name === "create_powerpoint") {
+      // 関数呼び出しが必要な場合
+      const functionArgs = JSON.parse(message.function_call.arguments);
+      const content = functionArgs.content;
+      
+      // PowerPoint生成関数を呼び出す
+      const pptxUrl = await generatePowerPoint(content);
+      
+      // 最終的な応答を生成
+      const finalResponse = await openai.chat.completions.create({
+        model: "gpt-4o",  // または使用したいモデル
+        messages: [
+          { role: "system", content: "あなたはユーザーの要求を理解し、必要に応じてPowerPointの作成を手伝います。" },
+          { role: "user", content: userPrompt },
+          message,
+          { 
+            role: "function", 
+            name: "create_powerpoint", 
+            content: JSON.stringify({ 
+              success: true, 
+              url: pptxUrl 
+            })
+          }
+        ]
+      });
+
+      return {
+        response: finalResponse.choices[0].message.content,
+        pptxUrl: pptxUrl
+      };
+    } else {
+      // 通常の応答
+      return {
+        response: message.content,
+        pptxUrl: null
+      };
+    }
+  } catch (error) {
+    console.error("エラーが発生しました:", error);
+    throw error;
+  }
+}
+
+// 使用例
+async function main() {
+  const userPrompt1 = "AIの歴史についてのプレゼンテーションを作成してください。1950年代から現在までの主要な出来事を含めてください。";
+  const userPrompt2 = "AIとは何ですか？";
+  
+  // PowerPoint変換が必要なプロンプト
+  const result1 = await processUserPrompt(userPrompt1);
+  console.log("プロンプト1の結果:");
+  console.log("応答:", result1.response);
+  console.log("PowerPointのURL:", result1.pptxUrl);
+  
+  // 普通の質問（PowerPoint変換不要）
+  const result2 = await processUserPrompt(userPrompt2);
+  console.log("\nプロンプト2の結果:");
+  console.log("応答:", result2.response);
+  console.log("PowerPointのURL:", result2.pptxUrl);
+}
+
+main().catch(console.error);
